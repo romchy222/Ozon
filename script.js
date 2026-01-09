@@ -1,4 +1,4 @@
-const { createApp } = Vue;
+const { createApp, markRaw } = Vue;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 const randomNoise = (scale) => (Math.random() - 0.5) * scale;
@@ -227,49 +227,56 @@ createApp({
       const trendCtx = document.getElementById("trendChart");
       const stateCtx = document.getElementById("stateChart");
 
-      this.chart = new Chart(trendCtx, {
-        type: "line",
-        data: {
-          labels: [],
-          datasets: [
-            { label: "Качество", data: [], borderColor: "#38bdf8", tension: 0.35 },
-            { label: "Residual O3", data: [], borderColor: "#f97316", tension: 0.35 },
-            { label: "Энергия", data: [], borderColor: "#22c55e", tension: 0.35 },
-            { label: "Нагрузка", data: [], borderColor: "#a855f7", tension: 0.35 },
-          ],
-        },
-        options: {
-          responsive: true,
-          animation: { duration: 500 },
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { display: false },
-            y: { ticks: { color: "#94a3b8" }, grid: { color: "rgba(148, 163, 184, 0.1)" } },
+      this.chart = markRaw(
+        new Chart(trendCtx, {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              { label: "Качество", data: [], borderColor: "#38bdf8", tension: 0.35 },
+              { label: "Residual O3", data: [], borderColor: "#f97316", tension: 0.35 },
+              { label: "Энергия", data: [], borderColor: "#22c55e", tension: 0.35 },
+              { label: "Нагрузка", data: [], borderColor: "#a855f7", tension: 0.35 },
+            ],
           },
-        },
-      });
+          options: {
+            responsive: true,
+            animation: { duration: 500 },
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { display: false },
+              y: { ticks: { color: "#94a3b8" }, grid: { color: "rgba(148, 163, 184, 0.1)" } },
+            },
+          },
+        })
+      );
 
-      this.stateChart = new Chart(stateCtx, {
-        type: "line",
-        data: {
-          labels: [],
-          datasets: [
-            { label: "ORP", data: [], borderColor: "#facc15", tension: 0.35 },
-            { label: "UV254", data: [], borderColor: "#fb7185", tension: 0.35 },
-          ],
-        },
-        options: {
-          responsive: true,
-          animation: { duration: 500 },
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { display: false },
-            y: { ticks: { color: "#94a3b8" }, grid: { color: "rgba(148, 163, 184, 0.1)" } },
+      this.stateChart = markRaw(
+        new Chart(stateCtx, {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              { label: "ORP", data: [], borderColor: "#facc15", tension: 0.35 },
+              { label: "UV254", data: [], borderColor: "#fb7185", tension: 0.35 },
+            ],
           },
-        },
-      });
+          options: {
+            responsive: true,
+            animation: { duration: 500 },
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { display: false },
+              y: { ticks: { color: "#94a3b8" }, grid: { color: "rgba(148, 163, 184, 0.1)" } },
+            },
+          },
+        })
+      );
     },
     updateCharts() {
+      if (!this.chart || !this.stateChart) {
+        return;
+      }
       const labels = this.history.map((_, index) => index + 1);
       this.chart.data.labels = labels;
       this.chart.data.datasets[0].data = this.history.map((point) => point.quality);
