@@ -1,361 +1,282 @@
-const inputs = {
-  flow: document.getElementById("flowInput"),
-  contamination: document.getElementById("contaminationInput"),
-  ozone: document.getElementById("ozoneInput"),
-  contact: document.getElementById("contactInput"),
-  temp: document.getElementById("tempInput"),
-  ph: document.getElementById("phInput"),
-};
-
-const values = {
-  flow: document.getElementById("flowValue"),
-  contamination: document.getElementById("contaminationValue"),
-  ozone: document.getElementById("ozoneValue"),
-  contact: document.getElementById("contactValue"),
-  temp: document.getElementById("tempValue"),
-  ph: document.getElementById("phValue"),
-};
-
-const outputs = {
-  quality: document.getElementById("qualityValue"),
-  residual: document.getElementById("residualValue"),
-  efficiency: document.getElementById("efficiencyValue"),
-  energy: document.getElementById("energyValue"),
-  qualityNote: document.getElementById("qualityNote"),
-  residualNote: document.getElementById("residualNote"),
-  efficiencyNote: document.getElementById("efficiencyNote"),
-  energyNote: document.getElementById("energyNote"),
-  qualityBadge: document.getElementById("qualityBadge"),
-  residualBadge: document.getElementById("residualBadge"),
-  energyBadge: document.getElementById("energyBadge"),
-  qualityBadgeNote: document.getElementById("qualityBadgeNote"),
-  residualBadgeNote: document.getElementById("residualBadgeNote"),
-  energyBadgeNote: document.getElementById("energyBadgeNote"),
-};
-
-const indicators = {
-  tau: document.getElementById("tauValue"),
-  orp: document.getElementById("orpValue"),
-  uv: document.getElementById("uvValue"),
-  safety: document.getElementById("safetyPill"),
-  mode: document.getElementById("modeIndicator"),
-  statusLoops: document.getElementById("statusLoops"),
-  statusRisk: document.getElementById("statusRisk"),
-  statusScenario: document.getElementById("statusScenario"),
-};
-
-const scenarioSelect = document.getElementById("scenarioSelect");
-const disturbanceToggle = document.getElementById("disturbanceToggle");
-const toggleButton = document.getElementById("toggleSimulation");
-const resetButton = document.getElementById("resetSimulation");
-const chart = document.getElementById("trendChart");
-const ctx = chart.getContext("2d");
-const eventLog = document.querySelector("#eventLog ul");
-
-let running = false;
-let history = [];
-let lastTimestamp = 0;
-let lastEvent = 0;
-let lastControl = { ozone: Number(inputs.ozone.value), contact: Number(inputs.contact.value) };
+const { createApp } = Vue;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 const randomNoise = (scale) => (Math.random() - 0.5) * scale;
 
-const scenarios = {
-  nominal: {
-    label: "Номинал",
-    flow: 65,
-    contamination: 22,
-    ozone: 120,
-    contact: 14,
-    temp: 18,
-    ph: 7.2,
+createApp({
+  data() {
+    return {
+      running: false,
+      inputs: {
+        flow: 65,
+        contamination: 22,
+        ozone: 120,
+        contact: 14,
+        temp: 18,
+        ph: 7.2,
+      },
+      control: {
+        feedforward: 0,
+        feedbackQuality: 0,
+        feedbackResidual: 0,
+        ozone: 120,
+        contact: 14,
+      },
+      metrics: {
+        quality: 92,
+        residual: 0.32,
+        energy: 1.8,
+        efficiency: 0.9,
+        orp: 620,
+        uv: 1.2,
+        temp: 18,
+        ph: 7.2,
+        qualityNote: "норма",
+        residualNote: "безопасно",
+        energyNote: "оптимальный режим",
+      },
+      status: {
+        loops: "Стабильно",
+        risk: "Низкий",
+      },
+      modules: [
+        { id: 1, name: "Смешивание", type: "Оператор 1", efficiency: 0.86, loss: 0.05, rate: 55 },
+        { id: 2, name: "Дозирование O3", type: "Оператор 6", efficiency: 0.91, loss: 0.08, rate: 72 },
+        { id: 3, name: "Контакт", type: "Оператор 13", efficiency: 0.88, loss: 0.06, rate: 64 },
+        { id: 4, name: "Дегазация", type: "Оператор 12", efficiency: 0.92, loss: 0.04, rate: 61 },
+        { id: 5, name: "Разделение", type: "Оператор 3", efficiency: 0.9, loss: 0.05, rate: 58 },
+      ],
+      newModule: {
+        name: "",
+        type: "Смешивание",
+      },
+      scenarios: {
+        nominal: { label: "Номинал", flow: 65, contamination: 22, ozone: 120, contact: 14, temp: 18, ph: 7.2 },
+        peak: { label: "Пиковые загрязнения", flow: 80, contamination: 60, ozone: 190, contact: 20, temp: 19, ph: 7.0 },
+        cold: { label: "Холодный режим", flow: 58, contamination: 32, ozone: 160, contact: 18, temp: 8, ph: 7.4 },
+        shock: { label: "Гидроудар", flow: 120, contamination: 26, ozone: 180, contact: 10, temp: 16, ph: 7.1 },
+      },
+      selectedScenario: "nominal",
+      events: [],
+      chart: null,
+      stateChart: null,
+      history: [],
+      lastTick: 0,
+    };
   },
-  peak: {
-    label: "Пиковые загрязнения",
-    flow: 75,
-    contamination: 55,
-    ozone: 180,
-    contact: 20,
-    temp: 19,
-    ph: 7.0,
+  computed: {
+    scenarioLabel() {
+      return this.scenarios[this.selectedScenario].label;
+    },
   },
-  cold: {
-    label: "Холодный режим",
-    flow: 58,
-    contamination: 30,
-    ozone: 150,
-    contact: 18,
-    temp: 8,
-    ph: 7.4,
+  mounted() {
+    this.initCharts();
+    this.applyScenario();
+    this.snapshot();
   },
-  shock: {
-    label: "Гидроудар",
-    flow: 110,
-    contamination: 26,
-    ozone: 170,
-    contact: 10,
-    temp: 16,
-    ph: 7.1,
-  },
-};
-
-const updateInputValues = () => {
-  values.flow.textContent = inputs.flow.value;
-  values.contamination.textContent = inputs.contamination.value;
-  values.ozone.textContent = inputs.ozone.value;
-  values.contact.textContent = inputs.contact.value;
-  values.temp.textContent = inputs.temp.value;
-  values.ph.textContent = Number.parseFloat(inputs.ph.value).toFixed(1);
-};
-
-const logEvent = (message) => {
-  const item = document.createElement("li");
-  const time = new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  item.textContent = `[${time}] ${message}`;
-  eventLog.prepend(item);
-  while (eventLog.children.length > 8) {
-    eventLog.removeChild(eventLog.lastChild);
-  }
-};
-
-const applyScenario = (key) => {
-  const preset = scenarios[key];
-  if (!preset) return;
-  inputs.flow.value = preset.flow;
-  inputs.contamination.value = preset.contamination;
-  inputs.ozone.value = preset.ozone;
-  inputs.contact.value = preset.contact;
-  inputs.temp.value = preset.temp;
-  inputs.ph.value = preset.ph;
-  indicators.statusScenario.textContent = preset.label;
-  updateInputValues();
-  snapshot();
-  logEvent(`Применён сценарий: ${preset.label}`);
-};
-
-const calculateControl = (state, disturbances) => {
-  const feedforward = state.contamination * 1.4 + state.flow * 0.4;
-  const feedbackQuality = (100 - disturbances.quality) * 0.8;
-  const feedbackResidual = disturbances.residual > 0.5 ? -20 : 0;
-
-  const targetOzone = clamp(feedforward + feedbackQuality + feedbackResidual, 40, 260);
-  const rampLimit = 18;
-  const ozone = clamp(
-    lastControl.ozone + clamp(targetOzone - lastControl.ozone, -rampLimit, rampLimit),
-    40,
-    260
-  );
-
-  const targetContact = clamp(10 + state.contamination / 8 - (state.flow - 60) / 20, 6, 30);
-  const contact = clamp(
-    lastControl.contact + clamp(targetContact - lastControl.contact, -2, 2),
-    6,
-    30
-  );
-
-  lastControl = { ozone, contact };
-
-  return { ozone, contact };
-};
-
-const calculateProcess = (state) => {
-  const disturbanceOn = disturbanceToggle.checked;
-  const temp = state.temp + (disturbanceOn ? randomNoise(0.8) : 0);
-  const ph = state.ph + (disturbanceOn ? randomNoise(0.12) : 0);
-  const pressure = disturbanceOn ? 1 + randomNoise(0.08) : 1;
-
-  const temperatureFactor = clamp(1 - Math.abs(temp - 18) * 0.018, 0.65, 1.15);
-  const phFactor = clamp(1 - Math.abs(ph - 7.2) * 0.1, 0.55, 1.1);
-  const mixingEfficiency = clamp((state.ozone / (state.flow * 1.4)) * 0.9, 0.35, 1.3);
-
-  const oxidation = clamp(
-    (state.ozone * state.contact * mixingEfficiency * temperatureFactor * phFactor * pressure) /
-      (state.contamination * 42),
-    0,
-    1.4
-  );
-
-  const quality = clamp(oxidation * 100, 12, 99);
-  const residual = clamp((state.ozone / state.flow) * 0.32 - oxidation * 0.12, 0, 2.6);
-  const efficiency = clamp(oxidation * 0.88 + mixingEfficiency * 0.12, 0.1, 1.2);
-  const energy = clamp(state.ozone * 0.017 + state.flow * 0.004 + 0.4, 0.5, 6.4);
-  const orp = clamp(550 + oxidation * 180 - state.contamination * 1.2, 420, 780);
-  const uv = clamp(2.1 + state.contamination / 12 - oxidation * 1.2, 0.5, 5.2);
-
-  return {
-    quality,
-    residual,
-    efficiency,
-    energy,
-    orp,
-    uv,
-    temp,
-    ph,
-  };
-};
-
-const updateStatus = (data) => {
-  const safe = data.residual < 0.4 && data.quality > 90;
-  indicators.safety.textContent = safe ? "Норма" : "Риск";
-  indicators.safety.style.background = safe ? "rgba(34, 197, 94, 0.2)" : "rgba(248, 113, 113, 0.2)";
-  indicators.safety.style.color = safe ? "#22c55e" : "#f87171";
-
-  indicators.statusLoops.textContent = data.quality > 88 ? "Стабильно" : "Требуется коррекция";
-  indicators.statusRisk.textContent = data.residual < 0.4 ? "Низкий" : "Средний";
-};
-
-const renderOutputs = (data, control) => {
-  outputs.quality.textContent = `${data.quality.toFixed(1)}%`;
-  outputs.residual.textContent = `${data.residual.toFixed(2)} мг/л`;
-  outputs.efficiency.textContent = `${(data.efficiency * 100).toFixed(0)}%`;
-  outputs.energy.textContent = `${data.energy.toFixed(2)} кВт·ч/м³`;
-
-  outputs.qualityNote.textContent = data.quality > 92 ? "норма" : "требуется коррекция";
-  outputs.residualNote.textContent = data.residual < 0.4 ? "безопасный уровень" : "приближение к лимиту";
-  outputs.efficiencyNote.textContent = data.efficiency > 0.75 ? "эффективно" : "умеренно";
-  outputs.energyNote.textContent = data.energy < 2.3 ? "экономичный режим" : "повышенное потребление";
-
-  outputs.qualityBadge.textContent = `${data.quality.toFixed(0)}%`;
-  outputs.residualBadge.textContent = `${data.residual.toFixed(2)} мг/л`;
-  outputs.energyBadge.textContent = `${data.energy.toFixed(2)} кВт·ч/м³`;
-
-  outputs.qualityBadgeNote.textContent = data.quality > 90 ? "качество в норме" : "ниже нормы";
-  outputs.residualBadgeNote.textContent = data.residual < 0.4 ? "безопасно" : "требует контроля";
-  outputs.energyBadgeNote.textContent = data.energy < 2.3 ? "оптимальный режим" : "нагрузка";
-
-  indicators.tau.textContent = `${control.contact.toFixed(1)} мин`;
-  indicators.orp.textContent = `${Math.round(data.orp)} мВ`;
-  indicators.uv.textContent = `${data.uv.toFixed(2)} ед`;
-};
-
-const renderChart = () => {
-  ctx.clearRect(0, 0, chart.width, chart.height);
-  ctx.fillStyle = "#0b1120";
-  ctx.fillRect(0, 0, chart.width, chart.height);
-
-  const padding = 42;
-  const width = chart.width - padding * 2;
-  const height = chart.height - padding * 2;
-
-  ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(padding, padding);
-  ctx.lineTo(padding, chart.height - padding);
-  ctx.lineTo(chart.width - padding, chart.height - padding);
-  ctx.stroke();
-
-  const points = history.slice(-50);
-  if (points.length < 2) {
-    return;
-  }
-
-  const plotLine = (key, color, max) => {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    points.forEach((point, index) => {
-      const x = padding + (index / (points.length - 1)) * width;
-      const y = chart.height - padding - clamp(point[key] / max, 0, 1) * height;
-      if (index === 0) {
-        ctx.moveTo(x, y);
+  methods: {
+    addModule() {
+      if (!this.newModule.name.trim()) return;
+      this.modules.push({
+        id: Date.now(),
+        name: this.newModule.name,
+        type: this.newModule.type,
+        efficiency: 0.85,
+        loss: 0.06,
+        rate: 50,
+      });
+      this.newModule.name = "";
+      this.logEvent(`Добавлен модуль: ${this.modules.at(-1).name}`);
+    },
+    applyScenario() {
+      const preset = this.scenarios[this.selectedScenario];
+      this.inputs = { ...preset };
+      this.logEvent(`Сценарий: ${preset.label}`);
+      this.snapshot();
+    },
+    toggleSimulation() {
+      this.running = !this.running;
+      if (this.running) {
+        this.lastTick = performance.now();
+        requestAnimationFrame(this.loop);
+        this.logEvent("Симуляция запущена.");
       } else {
-        ctx.lineTo(x, y);
+        this.logEvent("Симуляция остановлена.");
       }
-    });
-    ctx.stroke();
-  };
+    },
+    resetSimulation() {
+      this.history = [];
+      this.snapshot();
+      this.logEvent("Состояние сброшено.");
+    },
+    logEvent(message) {
+      const time = new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+      this.events.unshift({ id: Date.now(), message: `[${time}] ${message}` });
+      if (this.events.length > 6) {
+        this.events.pop();
+      }
+    },
+    calculateControl(previous) {
+      const feedforward = this.inputs.contamination * 1.35 + this.inputs.flow * 0.42;
+      const feedbackQuality = (100 - previous.quality) * 0.85;
+      const feedbackResidual = previous.residual > 0.5 ? -18 : 0;
 
-  plotLine("quality", "#38bdf8", 100);
-  plotLine("residual", "#f97316", 2.6);
-  plotLine("energy", "#22c55e", 6.4);
-  plotLine("load", "#a855f7", 120);
-};
+      const targetOzone = clamp(feedforward + feedbackQuality + feedbackResidual, 40, 280);
+      const rampLimit = 15;
+      const ozone = clamp(
+        this.control.ozone + clamp(targetOzone - this.control.ozone, -rampLimit, rampLimit),
+        40,
+        280
+      );
 
-const snapshot = () => {
-  const baseState = {
-    flow: Number(inputs.flow.value),
-    contamination: Number(inputs.contamination.value),
-    ozone: Number(inputs.ozone.value),
-    contact: Number(inputs.contact.value),
-    temp: Number(inputs.temp.value),
-    ph: Number(inputs.ph.value),
-  };
+      const targetContact = clamp(11 + this.inputs.contamination / 9 - (this.inputs.flow - 60) / 22, 6, 32);
+      const contact = clamp(
+        this.control.contact + clamp(targetContact - this.control.contact, -2, 2),
+        6,
+        32
+      );
 
-  const control = calculateControl(baseState, { quality: history.at(-1)?.quality ?? 90, residual: history.at(-1)?.residual ?? 0.3 });
-  const state = { ...baseState, ozone: control.ozone, contact: control.contact };
-  const data = calculateProcess(state);
+      this.control = {
+        feedforward,
+        feedbackQuality,
+        feedbackResidual,
+        ozone,
+        contact,
+      };
 
-  renderOutputs(data, control);
-  updateStatus(data);
+      return { ozone, contact };
+    },
+    calculateProcess(state) {
+      const temp = state.temp + randomNoise(0.7);
+      const ph = state.ph + randomNoise(0.1);
+      const pressure = 1 + randomNoise(0.06);
 
-  history.push({
-    quality: data.quality,
-    residual: data.residual,
-    energy: data.energy,
-    load: state.flow,
-  });
+      const temperatureFactor = clamp(1 - Math.abs(temp - 18) * 0.02, 0.6, 1.2);
+      const phFactor = clamp(1 - Math.abs(ph - 7.2) * 0.11, 0.5, 1.15);
+      const mixingEfficiency = clamp((state.ozone / (state.flow * 1.35)) * 0.92, 0.32, 1.35);
 
-  if (history.length > 120) {
-    history.shift();
-  }
+      const moduleBoost = this.modules.reduce((acc, module) => acc + module.efficiency, 0) / this.modules.length;
+      const oxidation = clamp(
+        (state.ozone * state.contact * mixingEfficiency * temperatureFactor * phFactor * pressure * moduleBoost) /
+          (state.contamination * 44),
+        0,
+        1.5
+      );
 
-  renderChart();
-};
+      return {
+        quality: clamp(oxidation * 100, 10, 99),
+        residual: clamp((state.ozone / state.flow) * 0.3 - oxidation * 0.1, 0, 2.8),
+        efficiency: clamp(oxidation * 0.85 + mixingEfficiency * 0.15, 0.1, 1.2),
+        energy: clamp(state.ozone * 0.016 + state.flow * 0.004 + 0.35, 0.4, 6.8),
+        orp: clamp(540 + oxidation * 190 - state.contamination * 1.1, 420, 800),
+        uv: clamp(2.0 + state.contamination / 11 - oxidation * 1.3, 0.4, 5.4),
+        temp,
+        ph,
+      };
+    },
+    updateStatus(metrics) {
+      this.status.loops = metrics.quality > 88 ? "Стабильно" : "Требует коррекции";
+      this.status.risk = metrics.residual < 0.45 ? "Низкий" : "Средний";
+    },
+    snapshot() {
+      const previous = this.history.at(-1) || { quality: this.metrics.quality, residual: this.metrics.residual };
+      const control = this.calculateControl(previous);
+      const state = {
+        flow: this.inputs.flow,
+        contamination: this.inputs.contamination,
+        ozone: control.ozone,
+        contact: control.contact,
+        temp: this.inputs.temp,
+        ph: this.inputs.ph,
+      };
 
-const loop = (timestamp) => {
-  if (!running) {
-    return;
-  }
-  if (timestamp - lastTimestamp > 900) {
-    snapshot();
-    lastTimestamp = timestamp;
-  }
-  if (timestamp - lastEvent > 7000) {
-    if (disturbanceToggle.checked) {
-      logEvent("Обнаружено возмущение: корректировка уставок QO3 и τ.");
-    }
-    lastEvent = timestamp;
-  }
-  requestAnimationFrame(loop);
-};
+      const metrics = this.calculateProcess(state);
+      this.metrics = {
+        ...metrics,
+        qualityNote: metrics.quality > 92 ? "норма" : "требуется корректировка",
+        residualNote: metrics.residual < 0.45 ? "безопасно" : "контроль лимитов",
+        energyNote: metrics.energy < 2.4 ? "оптимальный режим" : "повышенная нагрузка",
+      };
+      this.updateStatus(metrics);
 
-const toggleSimulation = () => {
-  running = !running;
-  toggleButton.textContent = running ? "Остановить" : "Запустить";
-  indicators.mode.textContent = running ? "AUTO" : "MANUAL";
-  if (running) {
-    lastTimestamp = 0;
-    lastEvent = 0;
-    requestAnimationFrame(loop);
-    logEvent("Симуляция запущена. Контуры в автоматическом режиме.");
-  } else {
-    logEvent("Симуляция остановлена. Переход в ручной режим.");
-  }
-};
+      this.history.push({
+        quality: metrics.quality,
+        residual: metrics.residual,
+        energy: metrics.energy,
+        load: state.flow,
+        orp: metrics.orp,
+        uv: metrics.uv,
+      });
+      if (this.history.length > 80) this.history.shift();
+      this.updateCharts();
+    },
+    loop(timestamp) {
+      if (!this.running) return;
+      if (timestamp - this.lastTick > 1000) {
+        this.snapshot();
+        this.lastTick = timestamp;
+      }
+      requestAnimationFrame(this.loop);
+    },
+    initCharts() {
+      const trendCtx = document.getElementById("trendChart");
+      const stateCtx = document.getElementById("stateChart");
 
-const resetSimulation = () => {
-  history = [];
-  lastControl = { ozone: Number(inputs.ozone.value), contact: Number(inputs.contact.value) };
-  snapshot();
-  logEvent("Состояние сброшено до текущих уставок.");
-};
+      this.chart = new Chart(trendCtx, {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [
+            { label: "Качество", data: [], borderColor: "#38bdf8", tension: 0.35 },
+            { label: "Residual O3", data: [], borderColor: "#f97316", tension: 0.35 },
+            { label: "Энергия", data: [], borderColor: "#22c55e", tension: 0.35 },
+            { label: "Нагрузка", data: [], borderColor: "#a855f7", tension: 0.35 },
+          ],
+        },
+        options: {
+          responsive: true,
+          animation: { duration: 500 },
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { display: false },
+            y: { ticks: { color: "#94a3b8" }, grid: { color: "rgba(148, 163, 184, 0.1)" } },
+          },
+        },
+      });
 
-Object.values(inputs).forEach((input) => {
-  input.addEventListener("input", () => {
-    updateInputValues();
-    snapshot();
-  });
-});
+      this.stateChart = new Chart(stateCtx, {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [
+            { label: "ORP", data: [], borderColor: "#facc15", tension: 0.35 },
+            { label: "UV254", data: [], borderColor: "#fb7185", tension: 0.35 },
+          ],
+        },
+        options: {
+          responsive: true,
+          animation: { duration: 500 },
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { display: false },
+            y: { ticks: { color: "#94a3b8" }, grid: { color: "rgba(148, 163, 184, 0.1)" } },
+          },
+        },
+      });
+    },
+    updateCharts() {
+      const labels = this.history.map((_, index) => index + 1);
+      this.chart.data.labels = labels;
+      this.chart.data.datasets[0].data = this.history.map((point) => point.quality);
+      this.chart.data.datasets[1].data = this.history.map((point) => point.residual);
+      this.chart.data.datasets[2].data = this.history.map((point) => point.energy);
+      this.chart.data.datasets[3].data = this.history.map((point) => point.load);
+      this.chart.update();
 
-scenarioSelect.addEventListener("change", (event) => {
-  applyScenario(event.target.value);
-});
-
-resetButton.addEventListener("click", resetSimulation);
-
-toggleButton.addEventListener("click", toggleSimulation);
-
-updateInputValues();
-applyScenario("nominal");
+      this.stateChart.data.labels = labels;
+      this.stateChart.data.datasets[0].data = this.history.map((point) => point.orp);
+      this.stateChart.data.datasets[1].data = this.history.map((point) => point.uv);
+      this.stateChart.update();
+    },
+  },
+}).mount("#app");

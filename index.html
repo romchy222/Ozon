@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ад‑Астра: озонная очистка воды — симулятор</title>
+  <title>Ad Astra · Ozon Physics Studio</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,295 +13,239 @@
   />
 </head>
 <body>
-  <div class="app-shell">
+  <div id="app" class="app-shell">
     <aside class="sidebar">
       <div class="brand">
         <span class="logo">AA</span>
         <div>
-          <p class="brand-title">Ад‑Астра Lab</p>
-          <p class="brand-subtitle">Ozon Water Control</p>
+          <p class="brand-title">Ad Astra Lab</p>
+          <p class="brand-subtitle">Ozon Physics Studio</p>
         </div>
       </div>
       <nav>
-        <button class="nav-item active">Панель</button>
-        <button class="nav-item">Сценарии</button>
-        <button class="nav-item">KPI</button>
-        <button class="nav-item">Диагностика</button>
+        <button class="nav-item active">Симуляция</button>
+        <button class="nav-item">Редактор модулей</button>
+        <button class="nav-item">Матрицы контроля</button>
+        <button class="nav-item">Экспорт модели</button>
       </nav>
       <div class="sidebar-card">
         <h4>Состояние станции</h4>
         <div class="status-line">
           <span>Контуры</span>
-          <strong id="statusLoops">Стабильно</strong>
+          <strong>{{ status.loops }}</strong>
         </div>
         <div class="status-line">
           <span>Риск</span>
-          <strong id="statusRisk">Низкий</strong>
+          <strong>{{ status.risk }}</strong>
         </div>
         <div class="status-line">
           <span>Сценарий</span>
-          <strong id="statusScenario">Номинал</strong>
+          <strong>{{ scenarioLabel }}</strong>
+        </div>
+      </div>
+      <div class="sidebar-card">
+        <h4>Драйверы физики</h4>
+        <div class="pill-grid">
+          <span class="pill">Кинетика</span>
+          <span class="pill">Гидравлика</span>
+          <span class="pill">Массообмен</span>
+          <span class="pill">ОРП/UV</span>
         </div>
       </div>
       <div class="sidebar-footer">
-        <p>Симуляция процесса непрерывной озонной очистки воды</p>
+        <p>Редактор цифрового двойника: озонная очистка воды</p>
       </div>
     </aside>
 
     <main class="content">
       <header class="hero">
         <div>
-          <p class="eyebrow">высокая детализация · 3 уровня управления</p>
+          <p class="eyebrow">управление · физика · оптимизация</p>
           <h1>Непрерывная озонная очистка воды</h1>
           <p class="lead">
-            Полноценная цифровая панель в стиле Ад‑Астра: операторная схема, каскадные контуры и
-            метрики качества. Используйте параметры процесса и сценарии, чтобы увидеть динамику
-            показателей и поведение системы управления.
+            Инженерный интерфейс уровня лабораторного стенда: настраиваемые модули, физические
+            зависимости и контрольные контуры. Меняйте параметры и наблюдайте динамику модели.
           </p>
         </div>
         <div class="kpi-stack">
           <div class="kpi-card">
             <span>Качество воды</span>
-            <strong id="qualityBadge">—</strong>
-            <small id="qualityBadgeNote">не рассчитано</small>
+            <strong>{{ metrics.quality.toFixed(1) }}%</strong>
+            <small>{{ metrics.qualityNote }}</small>
           </div>
           <div class="kpi-card">
             <span>Residual O3</span>
-            <strong id="residualBadge">—</strong>
-            <small id="residualBadgeNote">не рассчитано</small>
+            <strong>{{ metrics.residual.toFixed(2) }} мг/л</strong>
+            <small>{{ metrics.residualNote }}</small>
           </div>
           <div class="kpi-card">
             <span>Энергия</span>
-            <strong id="energyBadge">—</strong>
-            <small id="energyBadgeNote">не рассчитано</small>
+            <strong>{{ metrics.energy.toFixed(2) }} кВт·ч/м³</strong>
+            <small>{{ metrics.energyNote }}</small>
           </div>
         </div>
       </header>
 
-      <section class="grid">
-        <div class="panel controls">
+      <section class="studio-grid">
+        <div class="panel workspace">
           <div class="panel-header">
-            <h2>Панель управления</h2>
+            <div>
+              <h2>Редактор модулей</h2>
+              <p class="panel-subtitle">Соберите технологическую линию из операторов процесса.</p>
+            </div>
             <div class="actions">
-              <button id="toggleSimulation" class="primary">Запустить</button>
-              <button id="resetSimulation" class="ghost">Сброс</button>
+              <button class="primary" @click="toggleSimulation">{{ running ? 'Пауза' : 'Старт' }}</button>
+              <button class="ghost" @click="resetSimulation">Сброс</button>
             </div>
           </div>
 
-          <div class="scenario-row">
-            <label>
-              Сценарий
-              <select id="scenarioSelect">
-                <option value="nominal">Номинал</option>
-                <option value="peak">Пиковые загрязнения</option>
-                <option value="cold">Холодный режим</option>
-                <option value="shock">Гидроудар</option>
-              </select>
-            </label>
-            <label class="toggle">
-              <input type="checkbox" id="disturbanceToggle" checked />
-              <span>Случайные возмущения</span>
-            </label>
+          <div class="module-canvas">
+            <div class="module" v-for="module in modules" :key="module.id">
+              <div class="module-header">
+                <h3>{{ module.name }}</h3>
+                <span class="module-type">{{ module.type }}</span>
+              </div>
+              <div class="module-body">
+                <div class="module-metric">
+                  <span>Эффективность</span>
+                  <strong>{{ module.efficiency.toFixed(2) }}</strong>
+                </div>
+                <div class="module-metric">
+                  <span>Потери</span>
+                  <strong>{{ module.loss.toFixed(2) }}</strong>
+                </div>
+                <div class="module-metric">
+                  <span>Скорость</span>
+                  <strong>{{ module.rate.toFixed(1) }}</strong>
+                </div>
+              </div>
+            </div>
+            <div class="module add-module">
+              <h3>Добавить модуль</h3>
+              <label>
+                Название
+                <input v-model="newModule.name" placeholder="Напр. фильтр" />
+              </label>
+              <label>
+                Тип
+                <select v-model="newModule.type">
+                  <option>Смешивание</option>
+                  <option>Дозирование O3</option>
+                  <option>Контакт</option>
+                  <option>Дегазация</option>
+                  <option>Разделение</option>
+                  <option>Фильтрация</option>
+                </select>
+              </label>
+              <button class="primary" @click="addModule">Добавить</button>
+            </div>
           </div>
 
           <div class="control-grid">
             <label>
               Расход воды Qw (м³/ч)
-              <input type="range" min="20" max="140" value="65" step="1" id="flowInput" />
-              <span class="value" id="flowValue">65</span>
+              <input type="range" min="20" max="150" step="1" v-model.number="inputs.flow" />
+              <span class="value">{{ inputs.flow }}</span>
             </label>
             <label>
               Концентрация загрязнений Cin (мг/л)
-              <input type="range" min="5" max="80" value="22" step="1" id="contaminationInput" />
-              <span class="value" id="contaminationValue">22</span>
+              <input type="range" min="5" max="90" step="1" v-model.number="inputs.contamination" />
+              <span class="value">{{ inputs.contamination }}</span>
             </label>
             <label>
               Подача озона QO3 (г/ч)
-              <input type="range" min="40" max="260" value="120" step="1" id="ozoneInput" />
-              <span class="value" id="ozoneValue">120</span>
+              <input type="range" min="40" max="280" step="1" v-model.number="inputs.ozone" />
+              <span class="value">{{ inputs.ozone }}</span>
             </label>
             <label>
               Время контакта τ (мин)
-              <input type="range" min="4" max="36" value="14" step="1" id="contactInput" />
-              <span class="value" id="contactValue">14</span>
+              <input type="range" min="4" max="40" step="1" v-model.number="inputs.contact" />
+              <span class="value">{{ inputs.contact }}</span>
             </label>
             <label>
               Температура (°C)
-              <input type="range" min="4" max="36" value="18" step="1" id="tempInput" />
-              <span class="value" id="tempValue">18</span>
+              <input type="range" min="4" max="36" step="1" v-model.number="inputs.temp" />
+              <span class="value">{{ inputs.temp }}</span>
             </label>
             <label>
               pH
-              <input type="range" min="5.4" max="9.2" value="7.2" step="0.1" id="phInput" />
-              <span class="value" id="phValue">7.2</span>
+              <input type="range" min="5.4" max="9.2" step="0.1" v-model.number="inputs.ph" />
+              <span class="value">{{ inputs.ph.toFixed(1) }}</span>
             </label>
           </div>
+        </div>
 
-          <div class="control-columns">
+        <div class="panel analytics">
+          <div class="panel-header">
             <div>
-              <h3>Управляющие воздействия</h3>
+              <h2>Физические тренды</h2>
+              <p class="panel-subtitle">Динамика качества, residual O3, энергии и нагрузки.</p>
+            </div>
+            <select v-model="selectedScenario" @change="applyScenario">
+              <option value="nominal">Номинал</option>
+              <option value="peak">Пиковые загрязнения</option>
+              <option value="cold">Холодный режим</option>
+              <option value="shock">Гидроудар</option>
+            </select>
+          </div>
+          <div class="chart-stack">
+            <canvas id="trendChart"></canvas>
+            <canvas id="stateChart"></canvas>
+          </div>
+          <div class="legend-row">
+            <span class="legend quality">Качество</span>
+            <span class="legend residual">Residual O3</span>
+            <span class="legend energy">Энергия</span>
+            <span class="legend load">Нагрузка</span>
+            <span class="legend orp">ORP</span>
+            <span class="legend uv">UV254</span>
+          </div>
+        </div>
+
+        <div class="panel inspector">
+          <div class="panel-header">
+            <div>
+              <h2>Инспектор системы</h2>
+              <p class="panel-subtitle">Контуры, ограничения и аналитика.</p>
+            </div>
+            <span class="pill" :class="{ danger: metrics.residual > 0.5 }">
+              {{ metrics.residual > 0.5 ? 'LIMIT' : 'SAFE' }}
+            </span>
+          </div>
+          <div class="inspector-grid">
+            <div class="inspector-card">
+              <h3>Контуры управления</h3>
               <ul>
-                <li>Feedforward по Qw и Cin</li>
-                <li>Feedback по качеству и residual O3</li>
-                <li>Ограничение ramp на QO3</li>
+                <li>Feedforward: {{ control.feedforward.toFixed(1) }}</li>
+                <li>Feedback Q: {{ control.feedbackQuality.toFixed(1) }}</li>
+                <li>Feedback O3: {{ control.feedbackResidual.toFixed(1) }}</li>
+                <li>QO3 уставка: {{ control.ozone.toFixed(1) }}</li>
+                <li>τ уставка: {{ control.contact.toFixed(1) }}</li>
               </ul>
             </div>
-            <div>
-              <h3>Возмущения</h3>
+            <div class="inspector-card">
+              <h3>Сенсоры</h3>
               <ul>
-                <li>Температура и pH</li>
-                <li>Пульсации давления</li>
-                <li>Шум измерений</li>
+                <li>ORP: {{ metrics.orp.toFixed(0) }} мВ</li>
+                <li>UV254: {{ metrics.uv.toFixed(2) }}</li>
+                <li>Температура: {{ metrics.temp.toFixed(1) }} °C</li>
+                <li>pH: {{ metrics.ph.toFixed(2) }}</li>
               </ul>
             </div>
-          </div>
-        </div>
-
-        <div class="panel outputs">
-          <div class="panel-header">
-            <h2>Качество и безопасность</h2>
-            <span class="pill" id="safetyPill">Норма</span>
-          </div>
-          <div class="output-grid">
-            <div class="metric">
-              <span>Качество очищенной воды</span>
-              <strong id="qualityValue">—</strong>
-              <small id="qualityNote">нет данных</small>
+            <div class="inspector-card">
+              <h3>Журнал событий</h3>
+              <ul>
+                <li v-for="event in events" :key="event.id">{{ event.message }}</li>
+              </ul>
             </div>
-            <div class="metric">
-              <span>Остаточный озон</span>
-              <strong id="residualValue">—</strong>
-              <small id="residualNote">нет данных</small>
-            </div>
-            <div class="metric">
-              <span>Эффективность окисления</span>
-              <strong id="efficiencyValue">—</strong>
-              <small id="efficiencyNote">нет данных</small>
-            </div>
-            <div class="metric">
-              <span>Энергозатраты</span>
-              <strong id="energyValue">—</strong>
-              <small id="energyNote">нет данных</small>
-            </div>
-          </div>
-          <div class="chart-panel">
-            <canvas id="trendChart" width="680" height="320"></canvas>
-            <div class="chart-legend">
-              <span class="legend quality">Качество</span>
-              <span class="legend residual">Residual O3</span>
-              <span class="legend energy">Энергия</span>
-              <span class="legend load">Нагрузка</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="grid">
-        <div class="panel diagram">
-          <div class="panel-header">
-            <h2>Операторная схема</h2>
-            <div class="mode-indicator" id="modeIndicator">AUTO</div>
-          </div>
-          <div class="diagram-wrapper">
-            <svg viewBox="0 0 900 340" role="img" aria-label="Операторная схема непрерывной озонной очистки воды">
-              <defs>
-                <linearGradient id="pipe" x1="0" x2="1">
-                  <stop offset="0%" stop-color="#6366f1" />
-                  <stop offset="100%" stop-color="#22c55e" />
-                </linearGradient>
-              </defs>
-              <rect x="30" y="40" width="150" height="90" rx="18" fill="#0b1120" stroke="#334155" />
-              <text x="105" y="90" text-anchor="middle" fill="#e5e7eb">1. Смешивание</text>
-
-              <rect x="210" y="40" width="150" height="90" rx="18" fill="#0f172a" stroke="#334155" />
-              <text x="285" y="90" text-anchor="middle" fill="#e5e7eb">6. Дозирование O3</text>
-
-              <rect x="390" y="40" width="170" height="90" rx="18" fill="#0b1120" stroke="#334155" />
-              <text x="475" y="82" text-anchor="middle" fill="#e5e7eb">13. Контактная</text>
-              <text x="475" y="104" text-anchor="middle" fill="#e5e7eb">ёмкость</text>
-
-              <rect x="590" y="40" width="150" height="90" rx="18" fill="#0f172a" stroke="#334155" />
-              <text x="665" y="90" text-anchor="middle" fill="#e5e7eb">12. Дегазация</text>
-
-              <rect x="770" y="40" width="100" height="90" rx="18" fill="#0b1120" stroke="#334155" />
-              <text x="820" y="90" text-anchor="middle" fill="#e5e7eb">3. Разделение</text>
-
-              <line class="pipe" x1="180" y1="85" x2="210" y2="85" stroke="url(#pipe)" stroke-width="8" />
-              <line class="pipe" x1="360" y1="85" x2="390" y2="85" stroke="url(#pipe)" stroke-width="8" />
-              <line class="pipe" x1="560" y1="85" x2="590" y2="85" stroke="url(#pipe)" stroke-width="8" />
-              <line class="pipe" x1="740" y1="85" x2="770" y2="85" stroke="url(#pipe)" stroke-width="8" />
-
-              <circle cx="285" cy="190" r="52" fill="#111827" stroke="#38bdf8" />
-              <text x="285" y="185" text-anchor="middle" fill="#e5e7eb">Генератор</text>
-              <text x="285" y="207" text-anchor="middle" fill="#e5e7eb">O3</text>
-              <line x1="285" y1="138" x2="285" y2="85" stroke="#38bdf8" stroke-width="4" stroke-dasharray="8 8" />
-
-              <rect x="40" y="230" width="260" height="90" rx="18" fill="#0f172a" stroke="#334155" />
-              <text x="170" y="265" text-anchor="middle" fill="#e5e7eb">Входные переменные</text>
-              <text x="170" y="290" text-anchor="middle" fill="#94a3b8">Qw, Cin, QO3</text>
-
-              <rect x="330" y="230" width="240" height="90" rx="18" fill="#0b1120" stroke="#334155" />
-              <text x="450" y="265" text-anchor="middle" fill="#e5e7eb">Управляющие</text>
-              <text x="450" y="290" text-anchor="middle" fill="#94a3b8">QO3, τ</text>
-
-              <rect x="600" y="230" width="250" height="90" rx="18" fill="#0f172a" stroke="#334155" />
-              <text x="725" y="265" text-anchor="middle" fill="#e5e7eb">Возмущения</text>
-              <text x="725" y="290" text-anchor="middle" fill="#94a3b8">T, pH, P</text>
-            </svg>
-          </div>
-          <div class="flow-indicators">
-            <div class="flow-card">
-              <span>Время контакта</span>
-              <strong id="tauValue">—</strong>
-            </div>
-            <div class="flow-card">
-              <span>ORP</span>
-              <strong id="orpValue">—</strong>
-            </div>
-            <div class="flow-card">
-              <span>UV254</span>
-              <strong id="uvValue">—</strong>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel levels">
-          <div class="panel-header">
-            <h2>Три уровня управления</h2>
-            <span class="pill">каскад + оптимизация</span>
-          </div>
-          <ol class="levels-list">
-            <li>
-              <h3>Уровень 1 — Полевой</h3>
-              <p>PI/PID контуры держат расход, давление, уровень и подачу O3.</p>
-              <div class="bar">
-                <span style="width: 78%"></span>
-              </div>
-            </li>
-            <li>
-              <h3>Уровень 2 — Надзорный</h3>
-              <p>Каскадный расчёт уставок QO3 и τ по Qw, Cin и качеству.</p>
-              <div class="bar">
-                <span style="width: 64%"></span>
-              </div>
-            </li>
-            <li>
-              <h3>Уровень 3 — Оптимизация</h3>
-              <p>Экономика, сценарии и ограничения безопасности на горизонте часов.</p>
-              <div class="bar">
-                <span style="width: 46%"></span>
-              </div>
-            </li>
-          </ol>
-          <div class="log" id="eventLog">
-            <h4>Журнал событий</h4>
-            <ul></ul>
           </div>
         </div>
       </section>
     </main>
   </div>
 
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
