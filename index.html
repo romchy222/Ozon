@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Непрерывная озонная очистка воды — симулятор</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <p class="eyebrow">Симуляция & визуализация</p>
+      <h1>Непрерывная озонная очистка воды</h1>
+      <p class="lead">
+        Интерактивная модель операторной схемы (смешивание, разделение, дозирование озона, контакт,
+        дегазация) с трёхуровневым управлением и ключевыми переменными процесса.
+      </p>
+    </div>
+    <div class="stats">
+      <div>
+        <span>Качество воды</span>
+        <strong id="qualityBadge">—</strong>
+      </div>
+      <div>
+        <span>Residual O3</span>
+        <strong id="residualBadge">—</strong>
+      </div>
+      <div>
+        <span>Энергозатраты</span>
+        <strong id="energyBadge">—</strong>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="layout">
+      <div class="panel controls">
+        <h2>Входные параметры</h2>
+        <div class="control-grid">
+          <label>
+            Расход воды Qw (м³/ч)
+            <input type="range" min="20" max="120" value="60" step="1" id="flowInput" />
+            <span class="value" id="flowValue">60</span>
+          </label>
+          <label>
+            Концентрация загрязнений Cin (мг/л)
+            <input type="range" min="5" max="60" value="24" step="1" id="contaminationInput" />
+            <span class="value" id="contaminationValue">24</span>
+          </label>
+          <label>
+            Подача озона QO3 (г/ч)
+            <input type="range" min="30" max="220" value="110" step="1" id="ozoneInput" />
+            <span class="value" id="ozoneValue">110</span>
+          </label>
+          <label>
+            Время контакта τ (мин)
+            <input type="range" min="4" max="30" value="12" step="1" id="contactInput" />
+            <span class="value" id="contactValue">12</span>
+          </label>
+          <label>
+            Температура (°C)
+            <input type="range" min="5" max="35" value="18" step="1" id="tempInput" />
+            <span class="value" id="tempValue">18</span>
+          </label>
+          <label>
+            pH
+            <input type="range" min="5.5" max="9" value="7.2" step="0.1" id="phInput" />
+            <span class="value" id="phValue">7.2</span>
+          </label>
+        </div>
+        <div class="control-actions">
+          <button id="toggleSimulation" class="primary">Запустить симуляцию</button>
+          <button id="resetSimulation" class="ghost">Сбросить</button>
+        </div>
+        <p class="hint">
+          Модель упрощённая: расчёт учитывает кинетику окисления, эффективность растворения озона,
+          температуру и pH как возмущающие факторы.
+        </p>
+      </div>
+
+      <div class="panel outputs">
+        <h2>Выходные показатели</h2>
+        <div class="output-grid">
+          <div class="metric">
+            <span>Качество очищенной воды</span>
+            <strong id="qualityValue">—</strong>
+            <small id="qualityNote">нет данных</small>
+          </div>
+          <div class="metric">
+            <span>Остаточный озон</span>
+            <strong id="residualValue">—</strong>
+            <small id="residualNote">нет данных</small>
+          </div>
+          <div class="metric">
+            <span>Эффективность окисления</span>
+            <strong id="efficiencyValue">—</strong>
+            <small id="efficiencyNote">нет данных</small>
+          </div>
+          <div class="metric">
+            <span>Энергозатраты</span>
+            <strong id="energyValue">—</strong>
+            <small id="energyNote">нет данных</small>
+          </div>
+        </div>
+        <canvas id="trendChart" width="600" height="280"></canvas>
+      </div>
+    </section>
+
+    <section class="layout">
+      <div class="panel diagram">
+        <h2>Операторная схема процесса</h2>
+        <div class="diagram-wrapper">
+          <svg viewBox="0 0 800 320" role="img" aria-label="Операторная схема непрерывной озонной очистки воды">
+            <defs>
+              <linearGradient id="flow" x1="0" x2="1">
+                <stop offset="0%" stop-color="#4f46e5" />
+                <stop offset="100%" stop-color="#22c55e" />
+              </linearGradient>
+            </defs>
+            <rect x="20" y="40" width="130" height="80" rx="16" fill="#111827" />
+            <text x="85" y="88" text-anchor="middle" fill="#e5e7eb">1. Смешивание</text>
+            <rect x="190" y="40" width="130" height="80" rx="16" fill="#0f172a" />
+            <text x="255" y="88" text-anchor="middle" fill="#e5e7eb">6. Дозирование O3</text>
+            <rect x="360" y="40" width="150" height="80" rx="16" fill="#111827" />
+            <text x="435" y="78" text-anchor="middle" fill="#e5e7eb">13. Контактная</text>
+            <text x="435" y="100" text-anchor="middle" fill="#e5e7eb">ёмкость</text>
+            <rect x="540" y="40" width="130" height="80" rx="16" fill="#0f172a" />
+            <text x="605" y="88" text-anchor="middle" fill="#e5e7eb">12. Дегазация</text>
+            <rect x="690" y="40" width="90" height="80" rx="16" fill="#111827" />
+            <text x="735" y="88" text-anchor="middle" fill="#e5e7eb">3. Разделение</text>
+
+            <line x1="150" y1="80" x2="190" y2="80" stroke="url(#flow)" stroke-width="6" />
+            <line x1="320" y1="80" x2="360" y2="80" stroke="url(#flow)" stroke-width="6" />
+            <line x1="510" y1="80" x2="540" y2="80" stroke="url(#flow)" stroke-width="6" />
+            <line x1="670" y1="80" x2="690" y2="80" stroke="url(#flow)" stroke-width="6" />
+
+            <circle cx="255" cy="170" r="46" fill="#1e293b" />
+            <text x="255" y="165" text-anchor="middle" fill="#e5e7eb">Генератор</text>
+            <text x="255" y="185" text-anchor="middle" fill="#e5e7eb">O3</text>
+            <line x1="255" y1="124" x2="255" y2="80" stroke="#38bdf8" stroke-width="4" stroke-dasharray="6 6" />
+
+            <rect x="40" y="200" width="240" height="90" rx="18" fill="#0f172a" />
+            <text x="160" y="240" text-anchor="middle" fill="#e5e7eb">Входные переменные</text>
+            <text x="160" y="264" text-anchor="middle" fill="#94a3b8">Qw, Cin, QO3</text>
+
+            <rect x="320" y="200" width="220" height="90" rx="18" fill="#111827" />
+            <text x="430" y="240" text-anchor="middle" fill="#e5e7eb">Управляющие</text>
+            <text x="430" y="264" text-anchor="middle" fill="#94a3b8">QO3, τ</text>
+
+            <rect x="580" y="200" width="200" height="90" rx="18" fill="#0f172a" />
+            <text x="680" y="240" text-anchor="middle" fill="#e5e7eb">Возмущения</text>
+            <text x="680" y="264" text-anchor="middle" fill="#94a3b8">T, pH, P</text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="panel levels">
+        <h2>3-уровневая система управления</h2>
+        <ol class="levels-list">
+          <li>
+            <h3>Уровень 1 — Полевой</h3>
+            <p>Быстрые контуры PI/PID: расход, давление, уровень, дозирование O3.</p>
+            <span class="tag">секунды–минуты</span>
+          </li>
+          <li>
+            <h3>Уровень 2 — Надзорный</h3>
+            <p>Расчёт уставок QO3 и τ по Qw, Cin, T, pH и качеству воды.</p>
+            <span class="tag">минуты–десятки минут</span>
+          </li>
+          <li>
+            <h3>Уровень 3 — Оптимизация</h3>
+            <p>Минимизация затрат O3/энергии с соблюдением качества и ограничений.</p>
+            <span class="tag">часы–сутки</span>
+          </li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      Модель демонстрационная и предназначена для образовательной визуализации непрерывной
+      озонной очистки воды.
+    </p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
