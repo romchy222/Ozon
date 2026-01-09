@@ -7,6 +7,7 @@ createApp({
   data() {
     return {
       running: false,
+      activeTab: "sim",
       inputs: {
         flow: 65,
         contamination: 22,
@@ -87,6 +88,10 @@ createApp({
       });
       this.newModule.name = "";
       this.logEvent(`Добавлен модуль: ${this.modules.at(-1).name}`);
+    },
+    removeModule(id) {
+      this.modules = this.modules.filter((module) => module.id !== id);
+      this.logEvent("Модуль удалён из схемы.");
     },
     applyScenario() {
       const preset = this.scenarios[this.selectedScenario];

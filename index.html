@@ -22,11 +22,31 @@
           <p class="brand-subtitle">Ozon Physics Studio</p>
         </div>
       </div>
-      <nav>
-        <button class="nav-item active">Симуляция</button>
-        <button class="nav-item">Редактор модулей</button>
-        <button class="nav-item">Матрицы контроля</button>
-        <button class="nav-item">Экспорт модели</button>
+      <nav class="nav">
+        <button class="nav-item" :class="{ active: activeTab === 'sim' }" @click="activeTab = 'sim'">
+          <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 4h16v5H4zM4 13h7v7H4zM13 13h7v7h-7z" /></svg>
+          </span>
+          Симуляция
+        </button>
+        <button class="nav-item" :class="{ active: activeTab === 'modules' }" @click="activeTab = 'modules'">
+          <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10" /></svg>
+          </span>
+          Редактор модулей
+        </button>
+        <button class="nav-item" :class="{ active: activeTab === 'control' }" @click="activeTab = 'control'">
+          <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" /></svg>
+          </span>
+          Матрицы контроля
+        </button>
+        <button class="nav-item" :class="{ active: activeTab === 'export' }" @click="activeTab = 'export'">
+          <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l4-4m-4 4l-4-4M4 21h16" /></svg>
+          </span>
+          Экспорт модели
+        </button>
       </nav>
       <div class="sidebar-card">
         <h4>Состояние станции</h4>
@@ -94,16 +114,29 @@
               <p class="panel-subtitle">Соберите технологическую линию из операторов процесса.</p>
             </div>
             <div class="actions">
-              <button class="primary" @click="toggleSimulation">{{ running ? 'Пауза' : 'Старт' }}</button>
-              <button class="ghost" @click="resetSimulation">Сброс</button>
+              <button class="primary" @click="toggleSimulation">
+                <span class="icon">
+                  <svg viewBox="0 0 24 24"><path :d="running ? 'M6 4h4v16H6zM14 4h4v16h-4z' : 'M6 4l12 8-12 8z'" /></svg>
+                </span>
+                {{ running ? 'Пауза' : 'Старт' }}
+              </button>
+              <button class="ghost" @click="resetSimulation">
+                <span class="icon"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 101.8-5M4 4v5h5" /></svg></span>
+                Сброс
+              </button>
             </div>
           </div>
 
           <div class="module-canvas">
             <div class="module" v-for="module in modules" :key="module.id">
               <div class="module-header">
-                <h3>{{ module.name }}</h3>
-                <span class="module-type">{{ module.type }}</span>
+                <div>
+                  <h3>{{ module.name }}</h3>
+                  <span class="module-type">{{ module.type }}</span>
+                </div>
+                <button class="icon-button" @click="removeModule(module.id)" aria-label="Удалить модуль">
+                  <svg viewBox="0 0 24 24"><path d="M6 7h12M9 7V5h6v2m-7 0v12m4-12v12m4-12v12" /></svg>
+                </button>
               </div>
               <div class="module-body">
                 <div class="module-metric">

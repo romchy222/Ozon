@@ -26,6 +26,16 @@ body {
   min-height: 100vh;
 }
 
+svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 260px 1fr;
@@ -67,7 +77,7 @@ body {
   font-size: 0.85rem;
 }
 
-nav {
+.nav {
   display: grid;
   gap: 10px;
 }
@@ -76,11 +86,20 @@ nav {
   background: transparent;
   border: 1px solid transparent;
   color: var(--text);
-  padding: 10px 14px;
+  padding: 10px 12px;
   text-align: left;
   border-radius: 12px;
   font-weight: 600;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-item .icon {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
 }
 
 .nav-item.active,
@@ -223,6 +242,9 @@ button {
   border-radius: 999px;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 button.primary {
@@ -234,6 +256,28 @@ button.ghost {
   background: transparent;
   color: var(--text);
   border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+}
+
+.icon-button {
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  color: var(--text);
 }
 
 .control-grid {
@@ -296,7 +340,8 @@ select {
 .module-header {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .module-type {
